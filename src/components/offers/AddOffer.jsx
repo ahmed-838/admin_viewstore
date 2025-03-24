@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
@@ -18,6 +18,7 @@ const AddOffer = () => {
     description: '',
     image: null
   });
+  const [token, setToken] = useState('');
 
   const AVAILABLE_SIZES = ['S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL', '5XL'];
   const AVAILABLE_COLORS = [
@@ -32,6 +33,11 @@ const AddOffer = () => {
     { id: 'navy', label: 'كحلي', hex: '#000080' },
     { id: 'beige', label: 'بيج', hex: '#F5F5DC' }
   ];
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem('token') || sessionStorage.getItem('token');
+    setToken(storedToken || '');
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -176,27 +182,39 @@ const AddOffer = () => {
     setLoading(true);
     
     try {
+      let imageToUpload = offer.image;
+      if (offer.image && offer.image.size > 2 * 1024 * 1024) {
+        toast.info('جاري معالجة الصورة...');
+        imageToUpload = await compressImage(offer.image);
+      }
+      
       const formData = new FormData();
       formData.append('name', offer.name);
       formData.append('oldPrice', offer.oldPrice);
       formData.append('newPrice', offer.newPrice);
-      formData.append('description', offer.description || offer.name);
-      formData.append('category', 'offers');
-      
       formData.append('sizes', offer.sizes.join(','));
       formData.append('colors', offer.colors.join(','));
-      
-      formData.append('image', offer.image);
+      formData.append('description', offer.description || '');
+      formData.append('image', imageToUpload);
+
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 60000,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      };
+
+      if (token) {
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
 
       const API_URL = `${Config.API_BASE_URL}/api/offers`; 
       console.log('Submitting to:', API_URL);
       console.log('Form data:', offer);
       
-      const response = await axios.post(API_URL, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        }
-      });
+      const response = await axios.post(API_URL, formData, config);
 
       setOffer({
         name: '',
@@ -220,9 +238,19 @@ const AddOffer = () => {
       });
       
     } catch (error) {
-      console.error('Error adding offer:', error);
+      console.error('خطأ في إضافة العرض:', error);
       
-      toast.error(`حدث خطأ أثناء إضافة العرض: ${error.message || 'خطأ غير معروف'}`, {
+      let errorMessage = 'حدث خطأ أثناء إضافة العرض';
+      
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = 'انتهت مهلة الاتصال. يرجى التحقق من اتصالك بالإنترنت وحجم الصورة.';
+      } else if (error.response) {
+        errorMessage = error.response.data.message || errorMessage;
+      } else if (error.request) {
+        errorMessage = 'لم يتم استلام استجابة من الخادم. تحقق من اتصالك بالإنترنت.';
+      }
+      
+      toast.error(`حدث خطأ أثناء إضافة العرض: ${errorMessage}`, {
         position: "top-center",
         autoClose: false,
       });
@@ -246,6 +274,41 @@ const AddOffer = () => {
       setErrors({});
       toast.info('تم إعادة تعيين النموذج');
     }
+  };
+
+  const compressImage = async (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > 1200) {
+            const ratio = width / height;
+            width = 1200;
+            height = width / ratio;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob((blob) => {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            resolve(compressedFile);
+          }, 'image/jpeg', 0.7);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   return (
