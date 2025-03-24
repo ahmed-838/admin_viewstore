@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 import Config from '@/config/Config'; 
 
@@ -260,6 +261,18 @@ const AddProduct = () => {
 
   return (
     <div className="rtl bg-gray-50 min-h-screen py-8">
+      <ToastContainer
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={true}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+      
       <div className="container mx-auto p-6 max-w-3xl">
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <div className="p-6 border-b">

@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Config from '@/config/Config';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const UpdateOffer = () => {
   // حالات لعرض العروض
   const [offers, setOffers] = useState([]);
   const [loadingOffers, setLoadingOffers] = useState(false);
-  const [message, setMessage] = useState('');
   
   // إضافة حالات لتحديث العرض
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
@@ -36,7 +37,7 @@ const UpdateOffer = () => {
       setOffers(response.data);
     } catch (error) {
       console.error("خطأ في جلب العروض:", error);
-      setMessage(`خطأ في جلب العروض: ${error.message}`);
+      toast.error(`خطأ في جلب العروض: ${error.message}`);
     } finally {
       setLoadingOffers(false);
     }
@@ -47,14 +48,12 @@ const UpdateOffer = () => {
     if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا العرض؟')) {
       try {
         await axios.delete(`${Config.API_BASE_URL}/api/offers/${offerId}`);
-        window.alert('تم حذف العرض بنجاح');
-        setMessage('تم حذف العرض بنجاح');
+        toast.success('تم حذف العرض بنجاح');
         // تحديث قائمة العروض بعد الحذف
         fetchOffers();
       } catch (error) {
         console.error("خطأ في حذف العرض:", error);
-        w
-        setMessage(`خطأ في حذف العرض: ${error.message}`);
+        toast.error(`خطأ في حذف العرض: ${error.message}`);
       }
     }
   };
@@ -143,12 +142,12 @@ const UpdateOffer = () => {
         }
       });
       
-      setMessage('تم تحديث العرض بنجاح');
+      toast.success('تم تحديث العرض بنجاح');
       closeUpdateModal();
       fetchOffers(); // تحديث قائمة العروض
     } catch (error) {
       console.error("خطأ في تحديث العرض:", error);
-      setMessage(`خطأ في تحديث العرض: ${error.message}`);
+      toast.error(`خطأ في تحديث العرض: ${error.message}`);
     } finally {
       setUpdating(false);
     }
@@ -164,11 +163,19 @@ const UpdateOffer = () => {
     <div className="rtl container mx-auto p-6 bg-gray-50 text-black rounded-lg shadow-sm">
       <h2 className="text-3xl font-bold mb-8 text-gray-800 border-r-4 border-black pr-3">إدارة العروض</h2>
       
-      {message && (
-        <div className={`p-4 mb-6 rounded-lg shadow-sm ${message.includes('خطأ') ? 'bg-red-50 text-red-700 border-r-4 border-red-500' : 'bg-green-50 text-green-700 border-r-4 border-green-500'}`}>
-          {message}
-        </div>
-      )}
+      {/* إضافة مكون ToastContainer */}
+      <ToastContainer
+        position="top-center"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={true}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
       
       {/* قسم عرض العروض */}
       <div className="mt-8">

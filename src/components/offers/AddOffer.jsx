@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import axios from 'axios';
 import Config from '@/config/Config';
 
@@ -7,6 +8,7 @@ const AddOffer = () => {
   const fileInputRef = useRef(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const [offer, setOffer] = useState({
     name: '',
     oldPrice: '',
@@ -34,6 +36,10 @@ const AddOffer = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setOffer(prev => ({ ...prev, [name]: value }));
+    
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: null }));
+    }
   };
 
   const handleSizeToggle = (size) => {
@@ -43,6 +49,10 @@ const AddOffer = () => {
         ? prev.sizes.filter(s => s !== size)
         : [...prev.sizes, size]
     }));
+    
+    if (errors.sizes) {
+      setErrors(prev => ({ ...prev, sizes: null }));
+    }
   };
 
   const handleColorToggle = (colorId) => {
@@ -52,6 +62,10 @@ const AddOffer = () => {
         ? prev.colors.filter(c => c !== colorId)
         : [...prev.colors, colorId]
     }));
+    
+    if (errors.colors) {
+      setErrors(prev => ({ ...prev, colors: null }));
+    }
   };
 
   const handleImageChange = (e) => {
@@ -65,7 +79,10 @@ const AddOffer = () => {
 
     setOffer(prev => ({ ...prev, image: file }));
     
-    // إنشاء معاينة للصورة
+    if (errors.image) {
+      setErrors(prev => ({ ...prev, image: null }));
+    }
+    
     const reader = new FileReader();
     reader.onloadend = () => setPreview(reader.result);
     reader.readAsDataURL(file);
@@ -85,7 +102,6 @@ const AddOffer = () => {
       }
       setOffer(prev => ({ ...prev, image: file }));
       
-      // إنشاء معاينة للصورة
       const reader = new FileReader();
       reader.onloadend = () => setPreview(reader.result);
       reader.readAsDataURL(file);
@@ -93,57 +109,95 @@ const AddOffer = () => {
   };
 
   const validateForm = () => {
-    if (!offer.name.trim()) return 'يرجى إدخال اسم العرض';
-    if (!offer.oldPrice || isNaN(offer.oldPrice) || Number(offer.oldPrice) <= 0) 
-      return 'يرجى إدخال السعر القديم بشكل صحيح';
-    if (!offer.newPrice || isNaN(offer.newPrice) || Number(offer.newPrice) <= 0) 
-      return 'يرجى إدخال السعر الجديد بشكل صحيح';
-    if (Number(offer.newPrice) >= Number(offer.oldPrice))
-      return 'يجب أن يكون السعر الجديد أقل من السعر القديم';
-    if (offer.sizes.length === 0) return 'يرجى اختيار مقاس واحد على الأقل';
-    if (offer.colors.length === 0) return 'يرجى اختيار لون واحد على الأقل';
-    if (!offer.image) return 'يرجى إضافة صورة للعرض';
-    return null;
+    const newErrors = {};
+    let isValid = true;
+    
+    if (!offer.name.trim()) {
+      newErrors.name = 'يرجى إدخال اسم العرض';
+      isValid = false;
+    }
+    
+    if (!offer.oldPrice || isNaN(offer.oldPrice) || Number(offer.oldPrice) <= 0) {
+      newErrors.oldPrice = 'يرجى إدخال السعر القديم بشكل صحيح';
+      isValid = false;
+    }
+    
+    if (!offer.newPrice || isNaN(offer.newPrice) || Number(offer.newPrice) <= 0) {
+      newErrors.newPrice = 'يرجى إدخال السعر الجديد بشكل صحيح';
+      isValid = false;
+    } else if (Number(offer.newPrice) >= Number(offer.oldPrice)) {
+      newErrors.newPrice = 'يجب أن يكون السعر الجديد أقل من السعر القديم';
+      isValid = false;
+    }
+    
+    if (offer.sizes.length === 0) {
+      newErrors.sizes = 'يرجى اختيار مقاس واحد على الأقل';
+      isValid = false;
+    }
+    
+    if (offer.colors.length === 0) {
+      newErrors.colors = 'يرجى اختيار لون واحد على الأقل';
+      isValid = false;
+    }
+    
+    if (!offer.image) {
+      newErrors.image = 'يرجى إضافة صورة للعرض';
+      isValid = false;
+    }
+    
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const calculateDiscountPercentage = () => {
+    if (!offer.oldPrice || !offer.newPrice || isNaN(offer.oldPrice) || isNaN(offer.newPrice)) {
+      return null;
+    }
+    
+    const oldPrice = Number(offer.oldPrice);
+    const newPrice = Number(offer.newPrice);
+    
+    if (oldPrice <= 0 || newPrice <= 0 || newPrice >= oldPrice) {
+      return null;
+    }
+    
+    const discount = ((oldPrice - newPrice) / oldPrice) * 100;
+    return Math.round(discount);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    const error = validateForm();
-    if (error) {
-      toast.error(error);
+    if (!validateForm()) {
+      toast.error('يرجى تصحيح الأخطاء في النموذج قبل الإرسال');
       return;
     }
 
     setLoading(true);
     
     try {
-      // إنشاء كائن FormData لإرسال البيانات والصورة
       const formData = new FormData();
       formData.append('name', offer.name);
       formData.append('oldPrice', offer.oldPrice);
       formData.append('newPrice', offer.newPrice);
       formData.append('description', offer.description || offer.name);
-      formData.append('category', 'offers'); // إضافة فئة العروض
+      formData.append('category', 'offers');
       
-      // إضافة المقاسات والألوان كسلاسل مفصولة بفواصل
       formData.append('sizes', offer.sizes.join(','));
       formData.append('colors', offer.colors.join(','));
       
-      // إضافة الصورة
       formData.append('image', offer.image);
 
-      // تعديل عنوان الخادم - استخدم المسار الصحيح للخادم الخاص بك
       const API_URL = `${Config.API_BASE_URL}/api/offers`; 
+      console.log('Submitting to:', API_URL);
+      console.log('Form data:', offer);
       
-      // إرسال البيانات إلى الخادم
       const response = await axios.post(API_URL, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         }
       });
 
-      // إعادة تعيين النموذج
       setOffer({
         name: '',
         oldPrice: '',
@@ -154,30 +208,60 @@ const AddOffer = () => {
         image: null
       });
       setPreview(null);
+      setErrors({});
       
-      toast.success('تم إضافة العرض بنجاح!');
+      toast.success(`تم إضافة العرض "${response.data?.offer?.name || offer.name}" بنجاح!`, {
+        position: "top-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      
     } catch (error) {
       console.error('Error adding offer:', error);
       
-      // تحسين رسالة الخطأ
-      let errorMessage = 'حدث خطأ في الاتصال بالخادم';
-      
-      if (error.response) {
-        // الخادم استجاب برمز حالة خارج نطاق 2xx
-        errorMessage = error.response.data?.message || 'حدث خطأ في معالجة الطلب';
-      } else if (error.request) {
-        // لم يتم استلام استجابة من الخادم
-        errorMessage = 'لا يمكن الاتصال بالخادم، تأكد من تشغيل الخادم';
-      }
-      
-      toast.error(errorMessage);
+      toast.error(`حدث خطأ أثناء إضافة العرض: ${error.message || 'خطأ غير معروف'}`, {
+        position: "top-center",
+        autoClose: false,
+      });
     } finally {
       setLoading(false);
     }
   };
 
+  const handleReset = () => {
+    if (window.confirm('هل أنت متأكد من رغبتك في إعادة تعيين النموذج؟')) {
+      setOffer({
+        name: '',
+        oldPrice: '',
+        newPrice: '',
+        sizes: [],
+        colors: [],
+        description: '',
+        image: null
+      });
+      setPreview(null);
+      setErrors({});
+      toast.info('تم إعادة تعيين النموذج');
+    }
+  };
+
   return (
     <div className="rtl bg-gray-50 min-h-screen py-8">
+      <ToastContainer 
+        position="top-center"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        rtl={true}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+      />
+      
       <div className="container mx-auto p-6 max-w-3xl">
         <div className="bg-white rounded-xl shadow-md overflow-hidden">
           <div className="p-6 border-b">
@@ -185,7 +269,7 @@ const AddOffer = () => {
             <p className="text-gray-500 mt-1">أدخل تفاصيل العرض لإضافته إلى المتجر</p>
           </div>
           
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block mb-2 font-medium text-gray-700">اسم العرض</label>
@@ -194,9 +278,14 @@ const AddOffer = () => {
                   name="name"
                   value={offer.name}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-black"
+                  className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-black ${
+                    errors.name ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}
                   placeholder="مثال: سويت شيرت و بنطلون"
                 />
+                {errors.name && (
+                  <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                )}
               </div>
               
               <div>
@@ -220,9 +309,14 @@ const AddOffer = () => {
                   name="oldPrice"
                   value={offer.oldPrice}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-black"
+                  className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-black ${
+                    errors.oldPrice ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}
                   placeholder="مثال: 800"
                 />
+                {errors.oldPrice && (
+                  <p className="mt-1 text-sm text-red-600">{errors.oldPrice}</p>
+                )}
               </div>
               
               <div>
@@ -232,11 +326,28 @@ const AddOffer = () => {
                   name="newPrice"
                   value={offer.newPrice}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-black"
+                  className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-black ${
+                    errors.newPrice ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                  }`}
                   placeholder="مثال: 450"
                 />
+                {errors.newPrice && (
+                  <p className="mt-1 text-sm text-red-600">{errors.newPrice}</p>
+                )}
               </div>
             </div>
+            
+            {calculateDiscountPercentage() && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center">
+                <div className="bg-green-100 text-green-800 font-bold rounded-full h-10 w-10 flex items-center justify-center mr-3">
+                  {calculateDiscountPercentage()}%
+                </div>
+                <div>
+                  <p className="text-green-800 font-medium">نسبة الخصم: {calculateDiscountPercentage()}%</p>
+                  <p className="text-green-600 text-sm">توفير {Number(offer.oldPrice) - Number(offer.newPrice)} جنيه</p>
+                </div>
+              </div>
+            )}
             
             <div>
               <label className="block mb-2 font-medium text-gray-700">المقاسات المتاحة</label>
@@ -256,6 +367,9 @@ const AddOffer = () => {
                   </button>
                 ))}
               </div>
+              {errors.sizes && (
+                <p className="mt-2 text-sm text-red-600">{errors.sizes}</p>
+              )}
             </div>
             
             <div>
@@ -282,12 +396,16 @@ const AddOffer = () => {
                   </button>
                 ))}
               </div>
+              {errors.colors && (
+                <p className="mt-2 text-sm text-red-600">{errors.colors}</p>
+              )}
             </div>
             
             <div>
               <label className="block mb-2 font-medium text-gray-700">صورة العرض</label>
               <div 
                 className={`border-2 border-dashed rounded-lg p-6 text-center transition-all ${
+                  errors.image ? 'border-red-500 bg-red-50' :
                   preview ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-blue-500'
                 }`}
                 onDragOver={handleDragOver}
@@ -322,6 +440,9 @@ const AddOffer = () => {
                         onClick={() => {
                           setOffer(prev => ({ ...prev, image: null }));
                           setPreview(null);
+                          if (errors.image) {
+                            setErrors(prev => ({ ...prev, image: null }));
+                          }
                         }}
                         className="px-4 py-2 text-sm text-red-600 hover:text-red-700"
                       >
@@ -340,14 +461,18 @@ const AddOffer = () => {
                     </div>
                   </label>
                 )}
+                {errors.image && (
+                  <p className="mt-2 text-sm text-red-600">{errors.image}</p>
+                )}
               </div>
             </div>
             
-            <div className="pt-4 border-t">
+            <div className="pt-4 border-t flex gap-4">
               <button
-                type="submit"
+                type="button"
                 disabled={loading}
-                className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-all font-medium shadow-sm"
+                className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-blue-300 transition-all font-medium shadow-sm"
+                onClick={handleSubmit}
               >
                 {loading ? (
                   <span className="flex items-center justify-center">
@@ -358,6 +483,15 @@ const AddOffer = () => {
                     جاري الإضافة...
                   </span>
                 ) : 'إضافة العرض'}
+              </button>
+              
+              <button
+                type="button"
+                disabled={loading}
+                onClick={handleReset}
+                className="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
+              >
+                إعادة تعيين
               </button>
             </div>
           </form>

@@ -23,6 +23,8 @@ const UpdateProduct = () => {
     colors: []
   });
   const [updating, setUpdating] = useState(false);
+  // إضافة حالة جديدة للتحكم في ظهور الرسائل
+  const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
 
   // استدعاء المنتجات عند تحميل الصفحة
   useEffect(() => {
@@ -44,7 +46,7 @@ const UpdateProduct = () => {
       setFilteredProducts(productsList);
     } catch (error) {
       console.error("خطأ في جلب المنتجات:", error);
-      setMessage(`خطأ في جلب المنتجات: ${error.message}`);
+      showNotification(`خطأ في جلب المنتجات: ${error.message}`, 'error');
     } finally {
       setLoadingProducts(false);
     }
@@ -73,7 +75,7 @@ const UpdateProduct = () => {
         const token = localStorage.getItem('token');
         
         if (!token) {
-          setMessage('لم يتم العثور على توكن المصادقة. يرجى تسجيل الدخول مرة أخرى.');
+          showNotification('لم يتم العثور على توكن المصادقة. يرجى تسجيل الدخول مرة أخرى.', 'error');
           return;
         }
         
@@ -86,7 +88,7 @@ const UpdateProduct = () => {
         };
         
         await axios.delete(`${Config.API_BASE_URL}/api/products/${productId}`, config);
-        setMessage('تم حذف المنتج بنجاح');
+        showNotification('تم حذف المنتج بنجاح');
         // تحديث قائمة المنتجات بعد الحذف
         fetchProducts();
       } catch (error) {
@@ -94,9 +96,9 @@ const UpdateProduct = () => {
         
         // التعامل مع أخطاء المصادقة
         if (error.response && error.response.status === 401) {
-          setMessage('انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.');
+          showNotification('انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.', 'error');
         } else {
-          setMessage(`خطأ في حذف المنتج: ${error.message}`);
+          showNotification(`خطأ في حذف المنتج: ${error.message}`, 'error');
         }
       }
     }
@@ -155,12 +157,13 @@ const UpdateProduct = () => {
   // دالة لتحديث المنتج
   const handleUpdateSubmit = async (e) => {
     e.preventDefault();
+    setUpdating(true);
     try {
       // الحصول على التوكن من التخزين المحلي
       const token = localStorage.getItem('token');
       
       if (!token) {
-        setMessage('لم يتم العثور على توكن المصادقة. يرجى تسجيل الدخول مرة أخرى.');
+        showNotification('لم يتم العثور على توكن المصادقة. يرجى تسجيل الدخول مرة أخرى.', 'error');
         return;
       }
       
@@ -180,7 +183,7 @@ const UpdateProduct = () => {
         config
       );
       
-      setMessage('تم تحديث المنتج بنجاح');
+      showNotification('تم تحديث المنتج بنجاح');
       setIsUpdateModalOpen(false);
       fetchProducts(); // تحديث قائمة المنتجات
     } catch (error) {
@@ -188,22 +191,59 @@ const UpdateProduct = () => {
       
       // التعامل مع أخطاء المصادقة
       if (error.response && error.response.status === 401) {
-        setMessage('انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.');
-        // يمكنك هنا إضافة توجيه المستخدم إلى صفحة تسجيل الدخول
-        // navigate('/login');
+        showNotification('انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى.', 'error');
       } else {
-        setMessage(`خطأ في تحديث المنتج: ${error.message}`);
+        showNotification(`خطأ في تحديث المنتج: ${error.message}`, 'error');
       }
+    } finally {
+      setUpdating(false);
     }
+  };
+
+  // تعديل دالة عرض الرسائل
+  const showNotification = (message, type = 'success') => {
+    setNotification({ show: true, message, type });
+    // إخفاء الرسالة تلقائياً بعد 5 ثواني
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: 'success' });
+    }, 5000);
   };
 
   return (
     <div className="rtl container mx-auto p-6 bg-gray-50 text-black rounded-lg shadow-sm">
       <h2 className="text-3xl font-bold mb-8 text-gray-800 border-r-4 border-black pr-3">عرض المنتجات</h2>
       
-      {message && (
-        <div className={`p-4 mb-6 rounded-lg shadow-sm ${message.includes('خطأ') ? 'bg-red-50 text-red-700 border-r-4 border-red-500' : 'bg-green-50 text-green-700 border-r-4 border-green-500'}`}>
-          {message}
+      {/* مكون الإشعارات الجديد */}
+      {notification.show && (
+        <div 
+          className={`fixed top-5 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-lg shadow-lg flex items-center space-x-4 rtl:space-x-reverse min-w-[300px] animate-fade-in-down ${
+            notification.type === 'error' 
+              ? 'bg-red-50 text-red-700 border-r-4 border-red-500' 
+              : 'bg-green-50 text-green-700 border-r-4 border-green-500'
+          }`}
+        >
+          <div className="shrink-0">
+            {notification.type === 'error' ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <div className="ml-3 rtl:ml-0 rtl:mr-3">
+            <p className="font-medium">{notification.message}</p>
+          </div>
+          <button 
+            onClick={() => setNotification({ ...notification, show: false })}
+            className="shrink-0 mr-auto rtl:mr-0 rtl:ml-auto text-gray-400 hover:text-gray-600"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
         </div>
       )}
       
