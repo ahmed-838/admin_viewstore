@@ -219,11 +219,10 @@ const AddProduct = () => {
           console.log(`تقدم الرفع: ${percentCompleted}%`);
         }
       });
-
       // إذا نجحت العملية
       console.log('تم إضافة المنتج بنجاح:', response.data);
+      window.alert("تم اضافة المنتج بنجاح")
       toast.success(`تم إضافة المنتج بنجاح! المعرف: ${response.data.id || 'غير متوفر'}`);
-      
       // إعادة تعيين النموذج
       setProduct({
         name: '',

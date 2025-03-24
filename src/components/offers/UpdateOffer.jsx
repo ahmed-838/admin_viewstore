@@ -47,11 +47,13 @@ const UpdateOffer = () => {
     if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا العرض؟')) {
       try {
         await axios.delete(`${Config.API_BASE_URL}/api/offers/${offerId}`);
+        window.alert('تم حذف العرض بنجاح');
         setMessage('تم حذف العرض بنجاح');
         // تحديث قائمة العروض بعد الحذف
         fetchOffers();
       } catch (error) {
         console.error("خطأ في حذف العرض:", error);
+        w
         setMessage(`خطأ في حذف العرض: ${error.message}`);
       }
     }
